@@ -319,6 +319,11 @@ export function TypingPractice({ onSessionComplete, initialText, isTask = false 
   };
 
   // ── Render chars ──
+  // Geist Mono has no Bengali glyphs, and Bengali has no reliable monospace
+  // web font (conjuncts vary in width), so Bangla mode gets a proper Bengali
+  // text font instead of silently falling back to whatever the OS has.
+  const charFontCls = language === 'bangla' ? 'font-bengali' : 'font-mono';
+
   const renderCharacters = () =>
     text.split('').map((char, i) => {
       let cls = 'text-neutral-500';
@@ -331,7 +336,7 @@ export function TypingPractice({ onSessionComplete, initialText, isTask = false 
         <span
           key={i}
           ref={(el) => { charsRef.current[i] = el; }}
-          className={`font-mono text-xl sm:text-2xl leading-[2.2rem] ${cls}`}
+          className={`${charFontCls} text-xl sm:text-2xl leading-[2.2rem] ${cls}`}
         >
           {char}
         </span>

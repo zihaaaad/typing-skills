@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useToast } from '@/components/ToastProvider';
 import {
   Users, CheckCircle2, XCircle, BookOpen, Plus,
   Trash2, ShieldAlert, Download, Sliders
@@ -16,8 +17,7 @@ export default function AdminPage() {
   const [tasks, setTasks] = useState<any[] /* eslint-disable-line @typescript-eslint/no-explicit-any */>([]);
   const [targets, setTargets] = useState<any[] /* eslint-disable-line @typescript-eslint/no-explicit-any */>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const { showSuccess, showError } = useToast();
   const [metadata, setMetadata] = useState<{ courses: Record<string, string[]>, rollNumbersByBatch: Record<string, string[]> }>({ courses: {}, rollNumbersByBatch: {} });
   const [selectedPending, setSelectedPending] = useState<string[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; confirmLabel: string; onConfirm: () => void } | null>(null);
@@ -86,11 +86,11 @@ export default function AdminPage() {
 
     } catch (err) {
       console.error('Error fetching admin details:', err);
-      setError('Failed to load administration assets');
+      showError('Failed to load administration assets');
     } finally {
       setLoading(false);
     }
-  }, [filterCourse, filterBatch, filterRoll, filterStatus]);
+  }, [filterCourse, filterBatch, filterRoll, filterStatus, showError]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -99,8 +99,6 @@ export default function AdminPage() {
 
   // Update Student Status (Approve/Reject/Suspend)
   const handleUpdateStatus = async (studentId: string, status: string) => {
-    setMessage('');
-    setError('');
     try {
       const res = await fetch('/api/admin/students', {
         method: 'PUT',
@@ -110,13 +108,13 @@ export default function AdminPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setMessage(data.message);
+        showSuccess(data.message);
         loadAdminData();
       } else {
-        setError(data.error);
+        showError(data.error);
       }
     } catch {
-      setError('Failed to update student state.');
+      showError('Failed to update student state.');
     }
   };
 
@@ -141,9 +139,6 @@ export default function AdminPage() {
   };
 
   const performBulkAction = async (action: 'APPROVE' | 'REJECT') => {
-    setMessage('');
-    setError('');
-
     try {
       const res = await fetch('/api/admin/bulk-action', {
         method: 'POST',
@@ -153,25 +148,23 @@ export default function AdminPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setMessage(data.message);
+        showSuccess(data.message);
         setSelectedPending([]);
         loadAdminData();
       } else {
-        setError(data.error);
+        showError(data.error);
       }
     } catch {
-      setError('Failed to perform bulk action.');
+      showError('Failed to perform bulk action.');
     }
   };
 
   // Create Task
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage('');
-    setError('');
 
     if (!taskTitle || !taskContent || !taskDeadline || !taskBatches) {
-      setError('All task parameters are required.');
+      showError('All task parameters are required.');
       return;
     }
 
@@ -195,28 +188,26 @@ export default function AdminPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setMessage('Task created successfully and assigned to batch(es).');
+        showSuccess('Task created successfully and assigned to batch(es).');
         setTaskTitle('');
         setTaskContent('');
         setTaskDeadline('');
         setTaskBatches('');
         loadAdminData();
       } else {
-        setError(data.error);
+        showError(data.error);
       }
     } catch {
-      setError('Failed to deploy task.');
+      showError('Failed to deploy task.');
     }
   };
 
   // Create/Update Batch Target
   const handleUpsertTarget = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage('');
-    setError('');
 
     if (!targetBatchName) {
-      setError('Batch name is required.');
+      showError('Batch name is required.');
       return;
     }
 
@@ -233,23 +224,21 @@ export default function AdminPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setMessage(data.message);
+        showSuccess(data.message);
         setTargetBatchName('');
         setTargetMins('5');
         setTargetPenalty('10');
         loadAdminData();
       } else {
-        setError(data.error);
+        showError(data.error);
       }
     } catch {
-      setError('Failed to update target parameters.');
+      showError('Failed to update target parameters.');
     }
   };
 
   // Update Metadata
   const handleSaveMetadata = async (newMetadata: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
-    setMessage('');
-    setError('');
     try {
       const res = await fetch('/api/admin/metadata', {
         method: 'POST',
@@ -258,19 +247,18 @@ export default function AdminPage() {
       });
       if (res.ok) {
         setMetadata(newMetadata);
-        setMessage('Registration options updated successfully.');
+        showSuccess('Registration options updated successfully.');
       } else {
         const data = await res.json();
-        setError(data.error || 'Failed to update metadata.');
+        showError(data.error || 'Failed to update metadata.');
       }
     } catch {
-      setError('Failed to save metadata.');
+      showError('Failed to save metadata.');
     }
   };
 
   // Export CSV Report Client-Side
   const handleExportCSV = async () => {
-    setMessage('Compiling report...');
     try {
       const res = await fetch('/api/admin/reports');
       if (!res.ok) throw new Error('Fetch reports failed');
@@ -278,8 +266,7 @@ export default function AdminPage() {
       const report = data.report || [];
 
       if (report.length === 0) {
-        setError('No student records found to export.');
-        setMessage('');
+        showError('No student records found to export.');
         return;
       }
 
@@ -328,10 +315,9 @@ export default function AdminPage() {
       link.click();
       document.body.removeChild(link);
       
-      setMessage('CSV exported successfully.');
+      showSuccess('CSV exported successfully.');
     } catch {
-      setError('Failed to export CSV report.');
-      setMessage('');
+      showError('Failed to export CSV report.');
     }
   };
 
@@ -360,18 +346,6 @@ export default function AdminPage() {
             Export CSV Report
           </button>
         </section>
-
-        {/* Global Notifications */}
-        {message && (
-          <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-900/50 text-emerald-400 text-xs font-semibold">
-            {message}
-          </div>
-        )}
-        {error && (
-          <div className="p-3.5 rounded-xl bg-red-950/30 border border-red-900/50 text-red-400 text-xs font-semibold">
-            {error}
-          </div>
-        )}
 
         {/* Navigation Tabs */}
         <section className="flex flex-wrap gap-1 border-b border-neutral-900 pb-1">
@@ -925,7 +899,7 @@ export default function AdminPage() {
                       onClick={() => {
                         if (!newCourse.trim()) return;
                         if (metadata.courses[newCourse.trim()]) {
-                          setError('Course already exists');
+                          showError('Course already exists');
                           return;
                         }
                         handleSaveMetadata({
@@ -966,7 +940,7 @@ export default function AdminPage() {
                           if (!selectedCourseForBatch || !newBatch.trim()) return;
                           const currentBatches = metadata.courses[selectedCourseForBatch] || [];
                           if (currentBatches.includes(newBatch.trim())) {
-                            setError('Batch already exists in this course');
+                            showError('Batch already exists in this course');
                             return;
                           }
                           handleSaveMetadata({
@@ -1075,7 +1049,7 @@ export default function AdminPage() {
                             const currentRolls = metadata.rollNumbersByBatch[selectedBatchForRoll] || [];
                             const uniqueNewRolls = rollsToAdd.filter(r => !currentRolls.includes(r));
                             if (uniqueNewRolls.length === 0) {
-                              setError('Roll number(s) already exist in this batch');
+                              showError('Roll number(s) already exist in this batch');
                               return;
                             }
                             handleSaveMetadata({
