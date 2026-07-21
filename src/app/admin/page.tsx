@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
-import { 
-  Users, CheckCircle2, XCircle, BookOpen, Plus, 
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import {
+  Users, CheckCircle2, XCircle, BookOpen, Plus,
   Trash2, ShieldAlert, Download, Sliders
 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [metadata, setMetadata] = useState<{ courses: Record<string, string[]>, rollNumbersByBatch: Record<string, string[]> }>({ courses: {}, rollNumbersByBatch: {} });
   const [selectedPending, setSelectedPending] = useState<string[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; confirmLabel: string; onConfirm: () => void } | null>(null);
 
   // Metadata Form States
   const [newCourse, setNewCourse] = useState('');
@@ -119,15 +121,28 @@ export default function AdminPage() {
   };
 
   // Bulk Update Status
-  const handleBulkAction = async (action: 'APPROVE' | 'REJECT') => {
+  const handleBulkAction = (action: 'APPROVE' | 'REJECT') => {
     if (selectedPending.length === 0) return;
-    setMessage('');
-    setError('');
-    
+
     // Warn before rejecting
-    if (action === 'REJECT' && !confirm(`Are you sure you want to reject and delete ${selectedPending.length} user(s)?`)) {
+    if (action === 'REJECT') {
+      setConfirmDialog({
+        message: `Reject and delete ${selectedPending.length} user(s)? This cannot be undone.`,
+        confirmLabel: 'Delete',
+        onConfirm: () => {
+          setConfirmDialog(null);
+          performBulkAction(action);
+        },
+      });
       return;
     }
+
+    performBulkAction(action);
+  };
+
+  const performBulkAction = async (action: 'APPROVE' | 'REJECT') => {
+    setMessage('');
+    setError('');
 
     try {
       const res = await fetch('/api/admin/bulk-action', {
@@ -1082,15 +1097,20 @@ export default function AdminPage() {
                         <span className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">Total Roll Numbers: {(metadata.rollNumbersByBatch[selectedBatchForRoll] || []).length}</span>
                         <button
                           onClick={() => {
-                            if (confirm('Clear all roll numbers for this batch?')) {
-                              handleSaveMetadata({ 
-                                ...metadata, 
-                                rollNumbersByBatch: {
-                                  ...metadata.rollNumbersByBatch,
-                                  [selectedBatchForRoll]: []
-                                }
-                              });
-                            }
+                            setConfirmDialog({
+                              message: 'Clear all roll numbers for this batch? This cannot be undone.',
+                              confirmLabel: 'Clear All',
+                              onConfirm: () => {
+                                setConfirmDialog(null);
+                                handleSaveMetadata({
+                                  ...metadata,
+                                  rollNumbersByBatch: {
+                                    ...metadata.rollNumbersByBatch,
+                                    [selectedBatchForRoll]: []
+                                  }
+                                });
+                              },
+                            });
                           }}
                           className="text-[10px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider"
                         >
@@ -1135,6 +1155,14 @@ export default function AdminPage() {
         )}
 
       </main>
+
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message ?? ''}
+        confirmLabel={confirmDialog?.confirmLabel ?? 'Confirm'}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
     </div>
   );
 }

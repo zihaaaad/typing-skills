@@ -1,12 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, Lock, Mail } from 'lucide-react';
+import { Sparkles, ArrowRight, Mail } from 'lucide-react';
+import { PasswordInput } from '@/components/PasswordInput';
 
-export default function LoginPage() {
+// Only follow the redirect target if it's a same-site relative path — an
+// absolute or protocol-relative ("//evil.com") value could send a logged-in
+// user off-site.
+function isSafeRedirect(path: string | null): path is string {
+  return !!path && path.startsWith('/') && !path.startsWith('//');
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,8 +39,10 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Redirect depending on user role
-      if (data.user.role === 'ADMIN') {
+      const redirectTo = searchParams.get('redirect');
+      if (isSafeRedirect(redirectTo)) {
+        router.push(redirectTo);
+      } else if (data.user.role === 'ADMIN') {
         router.push('/admin');
       } else {
         router.push('/dashboard');
@@ -81,19 +92,19 @@ export default function LoginPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" size={18} />
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#111215] border border-neutral-800 text-neutral-100 placeholder-neutral-700 focus:outline-hidden focus:border-amber-500/50 transition-colors text-sm"
-              />
+            <div className="flex items-center justify-between">
+              <label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider">Password</label>
+              <Link href="/forgot-password" className="text-amber-500 hover:underline text-xs">
+                Forgot password?
+              </Link>
             </div>
+            <PasswordInput
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={setPassword}
+              placeholder="••••••••"
+            />
           </div>
 
           <button
@@ -114,5 +125,13 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

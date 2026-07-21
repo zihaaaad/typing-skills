@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, User, Mail, Lock, BookOpen, Layers, Hash, CheckCircle2, BadgeCheck } from 'lucide-react';
+import { Sparkles, ArrowRight, User, Mail, BookOpen, Layers, Hash, CheckCircle2, BadgeCheck, AlertTriangle } from 'lucide-react';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export default function RegisterPage() {
   const [activeTab, setActiveTab] = useState<'STUDENT' | 'GENERAL'>('STUDENT');
@@ -20,9 +21,10 @@ export default function RegisterPage() {
 
   // Metadata for Selectors
   const [metadata, setMetadata] = useState<{ courses: Record<string, string[]> } | null>(null);
+  const [metadataError, setMetadataError] = useState(false);
   const [availableRolls, setAvailableRolls] = useState<string[]>([]);
   const [fetchingRolls, setFetchingRolls] = useState(false);
-  
+
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
@@ -30,9 +32,15 @@ export default function RegisterPage() {
         if (res.ok) {
           const data = await res.json();
           setMetadata(data);
+          if (!data.courses || Object.keys(data.courses).length === 0) {
+            setMetadataError(true);
+          }
+        } else {
+          setMetadataError(true);
         }
       } catch (err) {
         console.error("Failed to load metadata", err);
+        setMetadataError(true);
       }
     };
     fetchMetadata();
@@ -234,24 +242,26 @@ export default function RegisterPage() {
 
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" size={18} />
-              <input
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Choose a secure password"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#111215] border border-neutral-800 text-neutral-100 placeholder-neutral-700 focus:outline-hidden focus:border-amber-500/50 transition-colors text-sm"
-              />
-            </div>
+            <PasswordInput
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={setPassword}
+              placeholder="Choose a secure password"
+            />
             <span className="text-neutral-600 text-[11px]">At least 8 characters</span>
           </div>
 
           {activeTab === 'STUDENT' && (
             <>
+              {metadataError && (
+                <div className="sm:col-span-2 flex items-start gap-2 p-3 rounded-xl bg-amber-950/30 border border-amber-900/50 text-amber-400 text-xs">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  <span>Course list unavailable right now. Please try again shortly, or contact your administrator if this continues.</span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider">Course Name</label>
                 <div className="relative">

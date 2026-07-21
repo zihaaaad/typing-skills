@@ -34,9 +34,11 @@ export function proxy(request: NextRequest) {
   const isStudentPage = path.startsWith('/dashboard') || path.startsWith('/practice');
 
   if (!token) {
-    // If not authenticated and trying to access protected page, redirect to login
+    // If not authenticated and trying to access protected page, redirect to
+    // login, remembering where they were headed so they land there after.
     if (isAdminPage || isStudentPage) {
       const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', path);
       return NextResponse.redirect(loginUrl);
     }
     return NextResponse.next();
@@ -46,7 +48,9 @@ export function proxy(request: NextRequest) {
   if (!payload) {
     // Token is corrupt, clear it and redirect to login
     if (isAdminPage || isStudentPage) {
-      const response = NextResponse.redirect(new URL('/login', request.url));
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', path);
+      const response = NextResponse.redirect(loginUrl);
       response.cookies.delete('token');
       return response;
     }

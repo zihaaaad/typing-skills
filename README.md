@@ -23,14 +23,21 @@ Supabase (Postgres), with custom JWT-based session auth.
      Supabase project's API settings
    - `JWT_SECRET` — a long random value (`openssl rand -base64 48`). The app
      will refuse to start without this set.
-2. Install dependencies and run the dev server:
+   - `SMTP_*` — optional, only needed for the forgot-password email. Without
+     these set, forgot-password requests still succeed (to avoid leaking
+     which emails are registered) but no email actually goes out; check the
+     server log for a clear warning if that happens.
+2. Run `scripts/sql/2026-07-21-add-password-reset-columns.sql` once against
+   your Supabase project (SQL editor) — the forgot-password flow needs the
+   `reset_token`/`reset_token_expires_at` columns it adds to `users`.
+3. Install dependencies and run the dev server:
 
    ```bash
    npm install
    npm run dev
    ```
 
-3. Open [http://localhost:3000](http://localhost:3000).
+4. Open [http://localhost:3000](http://localhost:3000).
 
 ## Scripts
 
@@ -56,3 +63,8 @@ be safely re-run — every collection is migrated with `upsert`.
   signature. `src/proxy.ts` only decodes the token (no signature check) to
   redirect page loads to the right place before render — it is not a
   security boundary on its own.
+- Password reset (`src/app/api/auth/forgot-password`,
+  `src/app/api/auth/reset-password`) stores a SHA-256 hash of a random token
+  on the user row with a 1-hour expiry, and emails the raw token via
+  `nodemailer` (see `src/lib/mail.ts`). Requires the SQL migration in
+  `scripts/sql/` and the `SMTP_*` env vars above.
