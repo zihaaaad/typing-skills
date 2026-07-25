@@ -89,16 +89,27 @@ export function useTypingEngine(targetText: string, durationLimitSeconds: number
       startTicking();
     }
 
-    // Track total keystrokes (forward only, not backspace)
-    if (value.length > typedText.length) {
-      const typedChar = value[value.length - 1];
+    // Track total keystrokes (forward only, not backspace). Counted in code
+    // units added (not a flat +1 per input event) because NFC normalization
+    // can expand a single keystroke into two code units — Bengali RRA/RHA/YYA
+    // (ড়/ঢ়/য়) are Unicode "composition exclusions", so a Bijoy Unicode
+    // layout emitting one as a single precomposed codepoint still normalizes
+    // to a 2-code-unit base-consonant+nukta sequence here. A flat +1 would
+    // undercount attempts relative to correctChars/incorrectChars (which are
+    // also code-unit-scored, see compareClusters), inflating accuracy% for
+    // any Bangla text containing those letters. Checking targetChar against
+    // the FIRST new position (not the last) keeps the strict-space check
+    // correct regardless of how many code units this event actually added.
+    const delta = value.length - typedText.length;
+    if (delta > 0) {
+      const firstNewChar = value[typedText.length];
       const targetChar = targetText[typedText.length];
 
-      setTotalAttempts((prev) => prev + 1);
+      setTotalAttempts((prev) => prev + delta);
 
       // STRICT SPACE RULE: If the target character is a space,
       // and the typed character is NOT a space, do not advance the input.
-      if (targetChar === ' ' && typedChar !== ' ') {
+      if (targetChar === ' ' && firstNewChar !== ' ') {
         return;
       }
     }

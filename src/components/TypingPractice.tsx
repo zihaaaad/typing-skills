@@ -181,6 +181,11 @@ export function TypingPractice({ onSessionComplete, initialText, isTask = false,
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
+  // Parallel to charsRef: the absolute index each cluster's span *starts*
+  // at, so the caret effect below can measure how far into a multi-code-unit
+  // Bangla conjunct the caret actually is, instead of only knowing which
+  // (possibly multi-code-unit) span it's in.
+  const clusterStartRef = useRef<number[]>([]);
   const soundRef = useRef(soundEnabled);
   useEffect(() => { soundRef.current = soundEnabled; }, [soundEnabled]);
 
@@ -338,9 +343,34 @@ export function TypingPractice({ onSessionComplete, initialText, isTask = false,
     const span = charsRef.current[activeIndex];
     if (!span || !innerRef.current) return;
 
-    const x = span.offsetLeft;
-    const y = span.offsetTop;
+    // A Bangla conjunct's span covers several absolute indices at once (kept
+    // as one contiguous text node so the browser can shape the ligature —
+    // see renderCharacters below). Mid-conjunct, activeIndex lands inside
+    // that span rather than at its start, so offsetLeft/offsetTop alone
+    // would freeze the caret at the conjunct's start for every keystroke
+    // typed into it, then jump forward all at once once it's complete.
+    // Measuring the sub-position with a Range (without altering the DOM,
+    // so shaping stays intact) keeps the caret advancing smoothly.
+    const clusterStart = clusterStartRef.current[activeIndex] ?? activeIndex;
+    const intraOffset = activeIndex - clusterStart;
+
+    let x = span.offsetLeft;
+    let y = span.offsetTop;
     const h = span.offsetHeight || 32;
+
+    if (intraOffset > 0 && span.firstChild && innerRef.current) {
+      const textNode = span.firstChild;
+      const safeOffset = Math.min(intraOffset, textNode.textContent?.length ?? 0);
+      const range = document.createRange();
+      range.setStart(textNode, safeOffset);
+      range.setEnd(textNode, safeOffset);
+      const rect = range.getClientRects()[0];
+      if (rect) {
+        const parentRect = innerRef.current.getBoundingClientRect();
+        x = rect.left - parentRect.left;
+        y = rect.top - parentRect.top;
+      }
+    }
 
     setCaretX(x);
     setCaretY(y);
@@ -380,6 +410,7 @@ export function TypingPractice({ onSessionComplete, initialText, isTask = false,
 
     setTimeout(() => {
       charsRef.current = [];
+      clusterStartRef.current = [];
       inputRef.current?.focus();
     }, 30);
   }, [duration, language, mode, initialText, resetEngine]);
@@ -462,7 +493,10 @@ export function TypingPractice({ onSessionComplete, initialText, isTask = false,
         <span
           key={ci}
           ref={(el) => {
-            for (let i = start; i < end; i++) charsRef.current[i] = el;
+            for (let i = start; i < end; i++) {
+              charsRef.current[i] = el;
+              clusterStartRef.current[i] = start;
+            }
           }}
           className={`${charFontCls} text-xl sm:text-2xl leading-[2.2rem] ${cls}`}
         >
